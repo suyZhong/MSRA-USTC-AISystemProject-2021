@@ -36,7 +36,9 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import StepLR
+from torch.utils.tensorboard import SummaryWriter, writer
 
+writer = SummaryWriter('../resources/runs/mnist_exp')
 
 class Net(nn.Module):
     def __init__(self):
@@ -66,6 +68,8 @@ class Net(nn.Module):
 
 def train(args, model, device, train_loader, optimizer, epoch):
     model.train()
+    running_loss = 0.0
+    correct = 0.0
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
@@ -73,10 +77,21 @@ def train(args, model, device, train_loader, optimizer, epoch):
         loss = F.nll_loss(output, target)
         loss.backward()
         optimizer.step()
+
+        running_loss+=loss.item()
+        # get the index of the max log-probability
+        pred = output.argmax(dim=1, keepdim=True)
+        correct += pred.eq(target.view_as(pred)).sum().item()
         if batch_idx % args.log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.item()))
+            if args.save_scalar and batch_idx != 0:
+                writer.add_scalar('training loss', running_loss / args.batch_size * args.log_interval, epoch * len(train_loader)+ batch_idx)
+                writer.add_scalar('training_accuracy', correct / args.batch_size * args.log_interval, epoch * len(train_loader) + batch_idx )
+            running_loss = 0.0
+            correct = 0.0
+
 
 
 def test(model, device, test_loader):
@@ -120,6 +135,12 @@ def main():
 
     parser.add_argument('--save-model', action='store_true', default=False,
                         help='For Saving the current Model')
+    parser.add_argument('--save-graph', action='store_true', default=False,
+                        help='For saving the model graph')
+    parser.add_argument('--save-scalar', action='store_true', default=False,
+                        help='For saving the Accuracy and Loss')
+    parser.add_argument('--profile', action='store_true', default=False,
+                        help='For Using profile to analyze')
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
 
@@ -142,8 +163,16 @@ def main():
                        ])),
         batch_size=args.test_batch_size, shuffle=True, **kwargs)
 
+    # get some random training images
+    dataiter = iter(train_loader)
+    images, labels = dataiter.next()
+    data = images.to(device)
+
     model = Net().to(device)
+
+
     optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
+
 
     scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
     for epoch in range(1, args.epochs + 1):
@@ -151,9 +180,17 @@ def main():
         test(model, device, test_loader)
         scheduler.step()
 
-    if args.save_model:
-        torch.save(model.state_dict(), "mnist_cnn.pt")
+    if args.save_graph:
+        writer.add_graph(model, images)
 
+    if args.save_model:
+        torch.save(model.state_dict(), "../resources/models/mnist_cnn.pt")
+    writer.close()
+    
+    if args.profile:
+        with torch.autograd.profiler.profile() as prof:
+            model(data[0].reshape(1, 1, 28, 28))
+        print(prof.key_averages().table(sort_by="self_cpu_time_total"))
 
 if __name__ == '__main__':
     main()
