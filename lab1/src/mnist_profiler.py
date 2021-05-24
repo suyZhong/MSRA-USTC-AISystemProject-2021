@@ -1,6 +1,6 @@
 # BSD 3-Clause License
 
-# Copyright (c) 2017, 
+# Copyright (c) 2017,
 # All rights reserved.
 
 # Redistribution and use in source and binary forms, with or without
@@ -28,17 +28,21 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+
+# This file has been changed for education and teaching purpose
+
 from __future__ import print_function
 import argparse
 import torch
-from torch.autograd.profiler import profile
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import torchvision
 from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import StepLR
-from torch.utils.tensorboard import SummaryWriter, writer
-import time
+
+import numpy as np
+import torchvision.models as models
 
 class Net(nn.Module):
     def __init__(self):
@@ -66,10 +70,9 @@ class Net(nn.Module):
         return output
 
 
-def train(args, model, device, train_loader, optimizer, epoch, writer):
+def train(args, model, device, train_loader, optimizer, epoch):
     model.train()
-    running_loss = 0.0
-    correct = 0.0
+
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
@@ -77,22 +80,10 @@ def train(args, model, device, train_loader, optimizer, epoch, writer):
         loss = F.nll_loss(output, target)
         loss.backward()
         optimizer.step()
-
-        running_loss+=loss.item()
-        # get the index of the max log-probability
-        pred = output.argmax(dim=1, keepdim=True)
-        correct += pred.eq(target.view_as(pred)).sum().item()
         if batch_idx % args.log_interval == 0:
-            # print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-            #     epoch, batch_idx * len(data), len(train_loader.dataset),
-            #     100. * batch_idx / len(train_loader), loss.item()))
-            if args.save_scalar and batch_idx != 0:
-                writer.add_scalar('training loss', running_loss / args.batch_size * args.log_interval, epoch * len(train_loader)+ batch_idx)
-                writer.add_scalar('training_accuracy', correct / args.batch_size * args.log_interval, epoch * len(train_loader) + batch_idx )
-            running_loss = 0.0
-            correct = 0.0
-
-
+            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                epoch, batch_idx * len(data), len(train_loader.dataset),
+                100. * batch_idx / len(train_loader), loss.item()))
 
 def test(model, device, test_loader):
     model.eval()
@@ -112,6 +103,14 @@ def test(model, device, test_loader):
         test_loss, correct, len(test_loader.dataset),
         100. * correct / len(test_loader.dataset)))
 
+# Add profile function
+def profile(model, device, train_loader):
+    dataiter = iter(train_loader)
+    data, target = dataiter.next()
+    data, target = data.to(device), target.to(device)
+    with torch.autograd.profiler.profile(use_cuda=False) as prof:
+        model(data[0].reshape(1,1,28,28))
+    print(prof.key_averages().table(sort_by="self_cpu_time_total"))
 
 def main():
     # Training settings
@@ -132,75 +131,47 @@ def main():
                         help='random seed (default: 1)')
     parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                         help='how many batches to wait before logging training status')
-    parser.add_argument('--dataset', type=str, default='../data/', help='decide the dataset path')
 
     parser.add_argument('--save-model', action='store_true', default=False,
                         help='For Saving the current Model')
-    parser.add_argument('--save-graph', action='store_true', default=False,
-                        help='For saving the model graph')
-    parser.add_argument('--save-scalar', action='store_true', default=False,
-                        help='For saving the Accuracy and Loss')
-    parser.add_argument('--profile', action='store_true', default=False,
-                        help='For Using profile to analyze')
-    parser.add_argument('--output', type=str, default='./output/', help='choose output path')
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
-    
-    writer = SummaryWriter(args.output)
+
     torch.manual_seed(args.seed)
 
     device = torch.device("cuda" if use_cuda else "cpu")
 
     kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
-    print(device)
     train_loader = torch.utils.data.DataLoader(
-        datasets.MNIST(args.dataset, train=True, download=True,
+        datasets.MNIST('../data', train=True, download=True,
                        transform=transforms.Compose([
                            transforms.ToTensor(),
                            transforms.Normalize((0.1307,), (0.3081,))
                        ])),
         batch_size=args.batch_size, shuffle=True, **kwargs)
     test_loader = torch.utils.data.DataLoader(
-        datasets.MNIST(args.dataset, train=False, transform=transforms.Compose([
+        datasets.MNIST('../data', train=False, transform=transforms.Compose([
                            transforms.ToTensor(),
                            transforms.Normalize((0.1307,), (0.3081,))
                        ])),
         batch_size=args.test_batch_size, shuffle=True, **kwargs)
 
-    # get some random training images
-    dataiter = iter(train_loader)
-    images, labels = dataiter.next()
-    data = images.to(device)
     model = Net().to(device)
-
-
     optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
-
-    if args.profile:
-        with torch.autograd.profiler.profile(use_cuda=use_cuda) as prof:
-            model(data[0].reshape(1, 1, 28, 28))
-        print(prof.key_averages().table(sort_by="self_cpu_time_total"))
-        # if bs is small or use cpu, the training just so slow
-        if args.batch_size<=2 or args.no_cuda:
-            exit(0)
-
     scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
+
+    # profile model
+    print("Start profiling...")
+    profile(model, device, train_loader)
+    print("Finished profiling.")
     for epoch in range(1, args.epochs + 1):
-        train(args, model, device, train_loader, optimizer, epoch, writer)
+        train(args, model, device, train_loader, optimizer, epoch)
         test(model, device, test_loader)
         scheduler.step()
 
-    if args.save_graph:
-        writer.add_graph(model, data)
-
     if args.save_model:
-        torch.save(model.state_dict(), "../resources/models/mnist_cnn.pt")
-    writer.close()
-    
-    if args.profile:
-        with torch.autograd.profiler.profile(use_cuda=use_cuda) as prof:
-            model(data[0].reshape(1, 1, 28, 28))
-        print(prof.key_averages().table(sort_by="self_cpu_time_total"))
+        torch.save(model.state_dict(), "mnist_cnn.pt")
+
 
 if __name__ == '__main__':
     main()
