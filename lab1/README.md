@@ -1,13 +1,13 @@
 ## 环境	
 
-|||Mac (local)|Bitahub|
-|--------|--------------|--------------------------|--------------------------|
-|硬件环境|CPU（vCPU数目）|6|2|
-||GPU(型号，数目)|无|gtx1080Ti|
-|软件环境|OS版本|MacOS Catalina|Maybe Ubuntu|
-||深度学习框架<br>python包名称及版本|Pytorch1.5 & Python3.7.4|Pytorch1.5 & Python|
-||CUDA版本|无||
-|||||
+|||Mac (local)|Bitahub|Server|
+|--------|--------------|--------------------------|--------------------------|--------------------------|
+|硬件环境|CPU（vCPU数目）|6|2|idk|
+||GPU(型号，数目)|无|gtx1080Ti，1|A100，1|
+|软件环境|OS版本|macOS Catalina|Ubuntu|Ubuntu 20.04|
+||深度学习框架<br>python包名称及版本|Pytorch1.5 & Python3.7.4|Pytorch1.5 & Python|Pytorch 1.7 & python 3.8.0|
+||CUDA版本|无|10.1|11.0|
+||||||
 
 ## 实验流程
 
@@ -78,7 +78,7 @@
       python mnist_stu.py --profile --dataset DATASET --output OUTPUT -batch_size 16
       ```
 
-5. 撰写[脚本](src/run_all.sh)，编写[dockerfile](../resources/dockerfile)，并上传到bitahub进行运行和测试
+5. 撰写[脚本](src/run_all.sh)，编写[dockerfile](resources/dockerfile)，并上传到bitahub进行运行和测试
 
 ## 实验结果
 
@@ -96,8 +96,6 @@
 
 ##### 网络分析（bs=64）
 
-使用bitahub进行profile分析会出现一个bug。即在训练前进行测试，卷积层上会花费巨额的时间，如下图：
-
 use_cuda profile
 
 ![profile1](images/profile1.png)
@@ -106,17 +104,51 @@ use_cpu profile
 
 ![profile_cpu_bita](images/profile_cpu_bita.png)
 
-都不同程度的在convolution花费时间很大，这很不寻常。
-
-而在mac上使用cpu进行profile如图
-
-![image-20210525134836739](images/image-20210525134836739.png)
-
-或者，在训练后再对模型进行profile：
-
-![image-20210525134959559](images/image-20210525134959559.png)
-
-则看起来符合预期。出现这样结果的原因推测还是bitahub的问题。
+可见，大部分时间都花在了卷积层上，同时，使用CPU和GPU得到的结果也不一样。具体分析见后。
 
 #### 2.网络分析
 
+##### On macOS
+
+|||
+|------|--------------|
+|批大小 &nbsp;| &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; local test on MacBook &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |
+|<br/>&nbsp;<br/>1<br/>&nbsp;<br/>&nbsp;|![image-20210525161046227](images/image-20210525161046227.png)|
+|<br/>&nbsp;<br/>16<br/>&nbsp;<br/>&nbsp;|![image-20210525161118486](images/image-20210525161118486.png)|
+|<br/>&nbsp;<br/>64<br/>&nbsp;<br/>&nbsp;|![image-20210525161233834](images/image-20210525161233834.png)|
+|||
+
+##### On bitahub (with CPU)
+
+|||
+|------|--------------|
+|批大小 &nbsp;| &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 结果比较 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |
+|<br/>&nbsp;<br/>1<br/>&nbsp;<br/>&nbsp;|![image-20210525162858716](images/image-20210525162858716.png)|
+|<br/>&nbsp;<br/>16<br/>&nbsp;<br/>&nbsp;|![image-20210525162913860](images/image-20210525162913860.png)|
+|<br/>&nbsp;<br/>64<br/>&nbsp;<br/>&nbsp;|![image-20210525162923831](images/image-20210525162923831.png)|
+|||
+
+##### On bitahub (with GPU)
+
+|||
+|------|--------------|
+|批大小 &nbsp;| &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 结果比较 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |
+|<br/>&nbsp;<br/>1<br/>&nbsp;<br/>&nbsp;|![image-20210525170443967](images/image-20210525170443967.png)|
+|<br/>&nbsp;<br/>16<br/>&nbsp;<br/>&nbsp;|![image-20210525170513233](images/image-20210525170513233.png)|
+|<br/>&nbsp;<br/>64<br/>&nbsp;<br/>&nbsp;|![image-20210525170523533](images/image-20210525170523533.png)|
+|||
+
+##### On bitahub (with GPU after train)
+
+bs=1训练起来太慢了。
+
+|||
+|------|--------------|
+|批大小 &nbsp;| &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 结果比较 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |
+|<br/>&nbsp;<br/>16<br/>&nbsp;<br/>&nbsp;|![image-20210525171643360](images/image-20210525171643360.png)|
+|<br/>&nbsp;<br/>64<br/>&nbsp;<br/>&nbsp;|![image-20210525171653800](images/image-20210525171653800.png)|
+|||
+
+- 在同配置下，CPU速度会比GPU测试的速度慢。
+- 对于CPU来说，花在add层和conv层的时间差不多，但是对于GPU来说conv层花销比add层花销大一个数量级
+- 在训练前和训练后对于所耗时间有明显区别，推测是默认模型参数与训练后参数不同导致的差异。
