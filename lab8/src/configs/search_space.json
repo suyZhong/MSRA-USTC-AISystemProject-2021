@@ -1,0 +1,8 @@
+{
+    "initial_lr": {"_type": "loguniform","_value": [0.001, 0.1]},
+    "weight_decay": {"_type": "loguniform","_value": [1e-6, 1e-3]},
+    "cutout": {"_type": "choice","_value": [0, 8]},
+    "batch_size": {"_type": "choice","_value": [256, 512]},
+    "optimizer": {"_type": "choice","_value": ["adam", "sgd"]},
+    "model": {"_type": "choice","_value": ["resnet50", "densenet121","resnext50_32x4d"]}
+}

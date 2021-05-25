@@ -1,0 +1,15 @@
+authorName: default
+experimentName: mnist
+trialConcurrency: 1
+maxExecDuration: 30m
+maxTrialNum: 5
+trainingServicePlatform: local
+searchSpacePath: search_space_mnist.json
+useAnnotation: false
+tuner:
+  builtinTunerName: TPE
+trial:
+  command: python mnist_basic.py --epochs 5
+  codeDir: ../
+  gpuNum: 0
+
