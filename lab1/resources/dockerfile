@@ -1,0 +1,49 @@
+FROM pytorch/pytorch:1.5.1-cuda10.1-cudnn7-devel
+#https://hub.docker.com/r/pytorch/pytorch/tags?page=1&ordering=last_updated
+
+ENV PYTHONPATH=".:$PYTHONPATH"
+
+RUN sed -i 's/archive.ubuntu.com/mirrors.ustc.edu.cn/g' /etc/apt/sources.list && \
+    APT_INSTALL="apt-get install -y --no-install-recommends" && \
+    PIP_INSTALL="python -m pip --no-cache-dir install --upgrade -i https://pypi.tuna.tsinghua.edu.cn/simple " && \
+    GIT_CLONE="git clone --depth 10" && \
+
+    rm -rf /var/lib/apt/lists/* \
+           /etc/apt/sources.list.d/cuda.list \
+           /etc/apt/sources.list.d/nvidia-ml.list && \
+
+    apt-get update && \
+
+    DEBIAN_FRONTEND=noninteractive $APT_INSTALL \
+        build-essential \
+        ca-certificates \
+        cmake \
+        wget \
+        git \
+        vim \
+        zip \
+        openssh-client \
+        openssh-server \
+        python-tk \
+        && \
+
+    DEBIAN_FRONTEND=noninteractive $PIP_INSTALL \
+        setuptools \
+        numpy \
+        chumpy \
+        pandas \
+        scikit-learn \
+        matplotlib \
+        Cython \
+	tensorboard \
+	nni \
+        && \
+
+
+    ldconfig && \
+    apt-get clean && \
+    apt-get autoremove && \
+    rm -rf /var/lib/apt/lists/* /tmp/* ~/*
+
+EXPOSE 6006
+WORKDIR /code

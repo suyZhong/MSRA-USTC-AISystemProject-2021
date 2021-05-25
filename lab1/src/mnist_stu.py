@@ -179,9 +179,9 @@ def main():
     if args.profile:
         with torch.autograd.profiler.profile(use_cuda=use_cuda) as prof:
             model(data[0].reshape(1, 1, 28, 28))
-        print(prof.key_averages().table(sort_by="self_cpu_time_total"))
+        print(prof.key_averages().table(sort_by="self_cpu_time_total", row_limit=10))
         # if bs is small or use cpu, the training just so slow
-        if args.batch_size<=2 or args.no_cuda:
+        if args.batch_size<=2 or not use_cuda:
             exit(0)
 
     scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
