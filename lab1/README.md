@@ -88,9 +88,35 @@
 
 ##### 神经网络数据流图
 
-![lab1-graph](images/lab1-graph.png)
+<img src="images/lab1-graph.png" alt="lab1-graph" style="zoom:50%;" />
 
 ##### 损失和正确率趋势图
 
-![train](images/train.png)![train](images/loss.png)
+<img src="images/train.png" alt="train" style="zoom:33%;" /><img src="images/loss.png" alt="train" style="zoom:33%;" />
+
+##### 网络分析（bs=64）
+
+使用bitahub进行profile分析会出现一个bug。即在训练前进行测试，卷积层上会花费巨额的时间，如下图：
+
+use_cuda profile
+
+![profile1](images/profile1.png)
+
+use_cpu profile
+
+![profile_cpu_bita](images/profile_cpu_bita.png)
+
+都不同程度的在convolution花费时间很大，这很不寻常。
+
+而在mac上使用cpu进行profile如图
+
+![image-20210525134836739](images/image-20210525134836739.png)
+
+或者，在训练后再对模型进行profile：
+
+![image-20210525134959559](images/image-20210525134959559.png)
+
+则看起来符合预期。出现这样结果的原因推测还是bitahub的问题。
+
+#### 2.网络分析
 

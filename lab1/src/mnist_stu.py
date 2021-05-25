@@ -200,7 +200,7 @@ def main():
     if args.profile:
         with torch.autograd.profiler.profile(use_cuda=use_cuda) as prof:
             model(data[0].reshape(1, 1, 28, 28))
-        print(prof.key_averages().table(sort_by="self_cpu_time_total"))
+        print(prof.key_averages().table(sort_by="self_cpu_time_total", row_limit=10))
 
 if __name__ == '__main__':
     main()
