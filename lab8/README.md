@@ -16,7 +16,7 @@
 
    1. 运行样例程序
 
-   2. 编写shell脚本进行手动调参（考虑到时间因素，开了两个任务进行训练，并且只对[lr](src/scripts/try_lr.sh)和[model](src/scripts/try_models.sh)进行训练）
+   2. 编写shell脚本进行手动调参（考虑到时间因素，开了两个任务进行训练，并且只对[lr](src/scripts/try_lr.sh)和[model](src/scripts/try_models1.sh)进行训练）
 
       ```shell
       # e.g. 脚本大概格式
@@ -75,7 +75,7 @@
 | &nbsp; <br /> &nbsp; 原始代码 &nbsp; <br /> &nbsp; |<img src="images/image-20210526135923406.png" alt="image-20210526135923406" style="zoom:50%;" />|0.8484![image-20210526140012067](images/image-20210526140012067.png)|
 | &nbsp; <br /> &nbsp; 手动调参 &nbsp; <br /> &nbsp; |![image-20210526140549183](images/image-20210526140549183.png)|0.8896![image-20210526140636370](images/image-20210526140636370.png)|
 | &nbsp; <br /> &nbsp; NNI自动调参 &nbsp; <br /> &nbsp; |![image-20210526160531225](images/image-20210526160531225.png)|0.7663![image-20210526160557354](images/image-20210526160557354.png)|
-| &nbsp; <br /> &nbsp; 网络架构搜索 <br />&nbsp; &nbsp; （可选） <br /> &nbsp; |见后|0.8956![image-20210526160954201](images/image-20210526160954201.png)|
+| &nbsp; <br /> &nbsp; 网络架构搜索 <br />&nbsp; &nbsp; （可选） <br /> &nbsp; |[见后](#Extra)|0.9447![image-20210527002324547](images/image-20210527002324547.png)|
 ||||
 
 #### 2.Code
@@ -198,37 +198,49 @@ mutables.LayerChoice(
 
 使用darts进行网络模型搜索，代码来自于nni的[repo](https://github.com/Microsoft/nni)。首先进行网络参数搜索并进行可视化`nas_darts.py`。
 
+**但是！**，在使用`enable_visualization`进行训练后，将bitahub的输出文件下载到本机准备使用webui进行可视化时，报错了。
 
+![image-20210526214516768](images/image-20210526214516768.png)
 
-然后使用`retrian.py`重新训练。考虑到默认参数是epochs=600，但根据tensorboard显示，在50时就已经有很好结果，并且比之前的模型(resnet50, densenet121)效果都好(test_accuracy能超过0.9)，就提前终止训练了。
+起初以为是node的问题，还重新`npm install`了，后来在stackoverflow上发现：
 
-![image-20210526131440310](images/image-20210526131440310.png)
+![image-20210526215851592](images/image-20210526215851592.png)
+
+即不可以使用相对路径。（这也太不友好了）改成绝对路径后，网络如图（搜索空间挺大的）
+
+![image-20210526220425024](images/image-20210526220425024.png)
+
+然后使用`retrian.py`重新训练。考虑到默认参数是epochs=600，但根据tensorboard显示，在50时就已经有很好结果，并且比之前的模型(resnet50, densenet121)效果都好(test_accuracy能超过0.9)，就不跑更久了。
+
+![image-20210527002615583](images/image-20210527002615583.png)
+
+上述训练除了epochs=60，其余全部采用默认参数，在[retrain.py](src/retrain.py)中可见。
 
 其中，[网络模型](resources/models/epoch_49.json)部分参数如下：
 
 ```json
 {
   "normal_n2_p0": 2,
-  "normal_n2_p1": 3,
+  "normal_n2_p1": 4,
   "normal_n2_switch": [
     "normal_n2_p0",
     "normal_n2_p1"
   ],
   "normal_n3_p0": 2,
-  "normal_n3_p1": 5,
+  "normal_n3_p1": 3,
   "normal_n3_p2": [],
   "normal_n3_switch": [
     "normal_n3_p0",
     "normal_n3_p1"
   ],
-    "...": ., 
-  "reduce_n5_p0": 0,
+    "...": .,
+  "reduce_n5_p0": [],
   "reduce_n5_p1": [],
-  "reduce_n5_p2": [],
+  "reduce_n5_p2": 2,
   "reduce_n5_p3": 2,
   "reduce_n5_p4": [],
   "reduce_n5_switch": [
-    "reduce_n5_p0",
+    "reduce_n5_p2",
     "reduce_n5_p3"
   ]
 }
