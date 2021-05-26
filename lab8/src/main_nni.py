@@ -40,7 +40,6 @@ from utils import AverageMeterGroup, accuracy, prepare_logger, reset_seed
 
 logger = logging.getLogger('hpo')
 
-
 def data_preprocess(args):
     def cutout_fn(img, length):
         h, w = img.size(1), img.size(2)
@@ -71,11 +70,11 @@ def data_preprocess(args):
     transform_train = transforms.Compose(augmentation + normalize + cutout)
     transform_test = transforms.Compose(normalize)
 
-    trainset = torchvision.datasets.CIFAR10(root=args.dataset, train=True, download=True, transform=transform_train)
+    trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
     train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size,
                                                shuffle=True, num_workers=args.num_workers)
 
-    testset = torchvision.datasets.CIFAR10(root=args.dataset, train=False, download=True, transform=transform_test)
+    testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
     test_loader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size,
                                               shuffle=False, num_workers=args.num_workers)
 
@@ -146,7 +145,9 @@ def main(args):
     for epoch in range(1, args.epochs + 1):
         train(model, train_loader, criterion, optimizer, scheduler, args, epoch, device)
         top1, _ = test(model, test_loader, criterion, args, epoch, device)
+        nni.report_intermediate_result(top1)
     logger.info("Final accuracy is: %.6f", top1)
+    nni.report_final_result(top1)
 
 
 if __name__ == '__main__':

@@ -8,16 +8,59 @@
 ||深度学习框架<br>python包名称及版本|Pytorch1.5 & Python3.7.4|Pytorch1.5 & Python|Pytorch 1.7 & python 3.8.0|
 ||CUDA版本|无|10.1|11.0|
 ||||||
-#### 1.basic
+## 实验流程
+
+先进行手动调参，然后使用nni进行调参，最后使用nas进行网络模型搜索。
+
+1. 默认参数及手动调参。（均在bitahub上进行）
+
+   1. 运行样例程序
+
+   2. 编写shell脚本进行手动调参（考虑到时间因素，开了两个任务进行训练，并且只对[lr](src/scripts/try_lr.sh)和[model](src/scripts/try_models.sh)进行训练）
+
+      ```shell
+      # e.g. 脚本大概格式
+      for lr in 0.01 0.05 0.07
+      do
+          echo "try lr=$lr"
+          python main.py --dataset $dataset --initial_lr $lr
+      done
+      ```
+
+   3. 根据上述结果，猜测合适的模型和学习率进行训练，保存结果。
+
+2. 使用nni进行参数搜索（因为bitahub无外网IP，也不支持ssh，即无法端口转发；为了能满足实验要求，能有WebUI，借了同学的一台服务器去进行实验）
+
+   1. 向样例代码中添加nni相关指令（[见下](#2Code)）
+
+   2. 编写nni设置文件，设置搜索空间。
+
+   3. 使用`nnictl`创建一个实验开始训练，并通过WebUI了解实验进程
+
+      1. 使用ssh端口映射去在本机上进行观看
+
+         ```shell
+         ssh xxx@xxx.xxx.xxx.xxx -L 127.0.0.1:8080:127.0.0.1:8080
+         ```
+
+   4. 获取训练后的结果，并重新进行训练
+
+3. 根据参考代码及nni的repo的代码，进行网络架构搜索。（在bitahub上进行）
+
+## 实验结果
+
+#### 1.overview
 
 ||||
 |---------|-----------------|------------|
 | 调参方式 | &nbsp; &nbsp; 超参名称和设置值 &nbsp; &nbsp; | &nbsp; &nbsp; 模型准确率 &nbsp; &nbsp; |
-| &nbsp; <br /> &nbsp; 原始代码 &nbsp; <br /> &nbsp; |<img src="images/image-20210526135923406.png" alt="image-20210526135923406" style="zoom:50%;" />|![image-20210526140012067](images/image-20210526140012067.png)|
-| &nbsp; <br /> &nbsp; 手动调参 &nbsp; <br /> &nbsp; |||
-| &nbsp; <br /> &nbsp; NNI自动调参 &nbsp; <br /> &nbsp; |||
-| &nbsp; <br /> &nbsp; 网络架构搜索 <br />&nbsp; &nbsp; （可选） <br /> &nbsp; |||
+| &nbsp; <br /> &nbsp; 原始代码 &nbsp; <br /> &nbsp; |<img src="images/image-20210526135923406.png" alt="image-20210526135923406" style="zoom:50%;" />|0.8484![image-20210526140012067](images/image-20210526140012067.png)|
+| &nbsp; <br /> &nbsp; 手动调参 &nbsp; <br /> &nbsp; |![image-20210526140549183](images/image-20210526140549183.png)|0.8896![image-20210526140636370](images/image-20210526140636370.png)|
+| &nbsp; <br /> &nbsp; NNI自动调参 &nbsp; <br /> &nbsp; |![image-20210526160531225](images/image-20210526160531225.png)|0.7663![image-20210526160557354](images/image-20210526160557354.png)|
+| &nbsp; <br /> &nbsp; 网络架构搜索 <br />&nbsp; &nbsp; （可选） <br /> &nbsp; |见后|0.8956![image-20210526160954201](images/image-20210526160954201.png)|
 ||||
+
+#### 2.Code
 
 #### 3.WebUI
 
