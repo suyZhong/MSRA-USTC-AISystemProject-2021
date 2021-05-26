@@ -1,17 +1,16 @@
 authorName: default
 experimentName: cifar10
 trialConcurrency: 1
-maxExecDuration: 1h
+maxExecDuration: 2h
 maxTrialNum: 10
 trainingServicePlatform: local
 searchSpacePath: search_space.json
 useAnnotation: false
 localConfig:
-  useActiveGpu: True
+  useActiveGpu: true
 tuner:
   builtinTunerName: TPE
 trial:
-  command: python main_nni.py --epochs 20 --dataset /data/4ZhongSuyang/cifar-10/
+  command: python main_nni.py --epochs 50
   codeDir: ../
   gpuNum: 1
-

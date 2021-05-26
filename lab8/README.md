@@ -37,7 +37,13 @@
 
    3. 使用`nnictl`创建一个实验开始训练，并通过WebUI了解实验进程
 
-      1. 使用ssh端口映射去在本机上进行观看
+      1. 创建experiment
+
+         ```sh
+         nnictl create --config configs.yml
+         ```
+
+      2. 使用ssh端口映射去在本机上进行观看
 
          ```shell
          ssh xxx@xxx.xxx.xxx.xxx -L 127.0.0.1:8080:127.0.0.1:8080
@@ -46,6 +52,18 @@
    4. 获取训练后的结果，并重新进行训练
 
 3. 根据参考代码及nni的repo的代码，进行网络架构搜索。（在bitahub上进行）
+
+   1. 搜索最优结构
+
+      ```shell
+      python /code/cifar/nas_darts.py --dataset DATASET --v1 --visualization
+      ```
+
+   2. 训练最优结构
+
+      ```sh
+      python retrain.py --dataset DATASET --arc-checkpoint ./checkpoints/epoch_49.json
+      ```
 
 ## 实验结果
 
@@ -61,6 +79,75 @@
 ||||
 
 #### 2.Code
+
+[main.py](src/main_nni.py)
+
+```python
+def main():
+	...
+	for epoch in range(1, args.epochs + 1):
+        train(model, train_loader, criterion, optimizer, scheduler, args, epoch, device)
+        top1, _ = test(model, test_loader, criterion, args, epoch, device)
+        nni.report_intermediate_result(top1)
+    logger.info("Final accuracy is: %.6f", top1)
+    nni.report_final_result(top1)
+    
+if __name__ == '__main__':
+    ...
+    args = parser.parse_args()
+    nni.utils.merge_parameter(args, nni.get_next_parameter())
+```
+
+[search_space.json](src/configs/search_space.json)
+
+```json
+{
+    "initial_lr": {"_type": "loguniform","_value": [0.001, 0.1]},
+    "weight_decay": {"_type": "loguniform","_value": [1e-6, 1e-3]},
+    "cutout": {"_type": "choice","_value": [0, 8]},
+    "batch_size": {"_type": "choice","_value": [256, 512]},
+    "optimizer": {"_type": "choice","_value": ["adam", "sgd"]},
+    "model": {"_type": "choice","_value": ["resnet50", "densenet121","resnext50_32x4d"]}
+}
+```
+
+[config.yml](src/configs/config.yml)
+
+```yaml
+authorName: default
+experimentName: cifar10
+trialConcurrency: 1
+maxExecDuration: 2h
+maxTrialNum: 10
+trainingServicePlatform: local
+searchSpacePath: search_space.json
+useAnnotation: false
+localConfig:
+  useActiveGpu: true
+tuner:
+  builtinTunerName: TPE
+trial:
+  command: python main_nni.py --epochs 50
+  codeDir: ../
+  gpuNum: 1
+```
+
+**注：** 在这里其实遇到了不少困难，nni官方提供的QuickStart其实有不少问题（nni==2.2.0）
+
+- 在使用GPU进行训练时，除了需要将gpuNum设置为1以外，还需要添加如下设置：
+
+  ```yaml
+  localConfig:
+    useActiveGpu: true
+  ```
+
+  否则在nni==2.2.0中就会报错：`Please set "use_active_gpu"`，并同时终止experiment。而在nni\=\=1.8.0中会正常进入WebUI，并在UI中提示错误。个人感觉这样的方式会更UserFriendly一点。
+
+  同时，在QuickStart和相关文档中，并没有查阅到*如果使用GPU，则需要在配置文件设置useActiveGpu*的相关说明。去翻阅源码，才发现需要对这个参数进行设置。因此个人认为这里不是很清楚，希望可以改进。
+
+- 给的样例代码中有一些typo，在[这一段](https://nni.readthedocs.io/zh/latest/Tutorial/QuickStart.html#experiment)的第二步，有个函数打错了
+
+  - `nni.report_intermeidate_result(test_acc)` ->`nni.report_intermediate_result(test_acc)`
 
 #### 3.WebUI
 
@@ -93,6 +180,21 @@ train的Acc较高但是，test的acc不高：过拟合了，而调整epochs数�
 | ![image-20210526134932462](images/image-20210526134932462.png) | ![image-20210526135031796](images/image-20210526135031796.png) |
 
 #### Extra
+
+定义的搜索空间为：
+
+```python
+mutables.LayerChoice(
+    [
+        ops.PoolBN('max', channels, 3, stride, 1, affine=False),
+        ops.PoolBN('avg', channels, 3, stride, 1, affine=False),
+        nn.Identity() if stride == 1 else ops.FactorizedReduce(channels, channels, affine=False),
+        ops.SepConv(channels, channels, 3, stride, 1, affine=False),
+        ops.SepConv(channels, channels, 5, stride, 2, affine=False),
+        ops.DilConv(channels, channels, 3, stride, 2, 2, affine=False),
+        ops.DilConv(channels, channels, 5, stride, 4, 2, affine=False)
+    ],
+```
 
 使用darts进行网络模型搜索，代码来自于nni的[repo](https://github.com/Microsoft/nni)。首先进行网络参数搜索并进行可视化`nas_darts.py`。
 
