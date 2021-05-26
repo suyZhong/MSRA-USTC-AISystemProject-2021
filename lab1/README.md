@@ -13,6 +13,8 @@
 
 大体流程为，先在mac上测试程序没有bug，然后写shell脚本将所有流程整合并上传到bitahub平台进行运行。
 
+0. 给bitahub配置环境（自己想办法弄[dockerfile](resources/dockerfile)）「吐槽一句，bitahub网好不稳定」
+
 1. 运行MNIST样例程序
 
 2. 修改样例代码，保存网络信息，并使用TensorBoard画出神经网络数据流图。
@@ -78,7 +80,7 @@
       python mnist_stu.py --profile --dataset DATASET --output OUTPUT -batch_size 16
       ```
 
-5. 撰写[脚本](src/run_all.sh)，编写[dockerfile](resources/dockerfile)，并上传到bitahub进行运行和测试
+5. 撰写[脚本](src/run_all.sh)，并上传到bitahub进行运行和测试
 
 ## 实验结果
 
